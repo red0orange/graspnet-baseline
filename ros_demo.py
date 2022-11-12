@@ -89,6 +89,7 @@ def vis_grasps(gg, cloud):
 class GraspNet1BillionInterface:
     def __init__(self, rgb_topic_name, depth_topic_name, camera_info_topic_name, net):
         rospy.init_node("graspnet_1billion_interface")
+        self.flag = False
 
         # infer
         self.net = net
@@ -98,7 +99,9 @@ class GraspNet1BillionInterface:
         self.tf_br = tf.TransformBroadcaster()
         image_sub = message_filters.Subscriber(rgb_topic_name, sensor_msgs.msg.Image)
         depth_sub = message_filters.Subscriber(depth_topic_name, sensor_msgs.msg.Image)
-        info_sub = message_filters.Subscriber(camera_info_topic_name, sensor_msgs.msg.CameraInfo)
+        info_sub = message_filters.Subscriber(
+            camera_info_topic_name, sensor_msgs.msg.CameraInfo
+        )
         ts = message_filters.ApproximateTimeSynchronizer(
             [image_sub, depth_sub, info_sub], 1, slop=1
         )
@@ -153,15 +156,14 @@ class GraspNet1BillionInterface:
             gg = self.infer(rgb_image, depth_image, camera_info)
             rotation_matrices = gg.rotation_matrices
             translations = gg.translations
+            num = translations.shape[0]
 
             while True:
                 time.sleep(1)
-                for i, (rotation_matrice, translation) in enumerate(
-                    rotation_matrices, translations
-                ):
-                    T_matrice = np.diag([4, 4], dtype=np.float32)
-                    T_matrice[:3, :3] = rotation_matrice
-                    T_matrice[:3, -1] = translation
+                for i in range(num):
+                    T_matrice = np.identity(4)
+                    T_matrice[:3, :3] = rotation_matrices[i]
+                    T_matrice[:3, -1] = translations[i]
 
                     trans = T.translation_from_matrix(T_matrice)
                     quaternion = T.quaternion_from_matrix(T_matrice)
@@ -266,24 +268,24 @@ if __name__ == "__main__":
     )
 
     # image test
-    rgb_path = (
-        "/home/dehao/Projects/GraspFramework/graspnet-baseline/test_data/0_color.png"
-    )
-    depth_path = (
-        "/home/dehao/Projects/GraspFramework/graspnet-baseline/test_data/0_depth.png"
-    )
-    color = np.array(Image.open(rgb_path), dtype=np.float32) / 255.0
-    depth = np.array(Image.open(depth_path))
-    camera_info = {
-        "fx": 908.5330810546875,
-        "fy": 909.3223876953125,
-        "cx": 647.282470703125,
-        "cy": 354.7244873046875,
-        "image_width": 1280,
-        "image_height": 720,
-        "factor_depth": 1000.0,
-    }
-    interface.image_test(color, depth, camera_info)
+    # rgb_path = (
+    #     "/home/dehao/Projects/GraspFramework/graspnet-baseline/test_data/0_color.png"
+    # )
+    # depth_path = (
+    #     "/home/dehao/Projects/GraspFramework/graspnet-baseline/test_data/0_depth.png"
+    # )
+    # color = np.array(Image.open(rgb_path), dtype=np.float32) / 255.0
+    # depth = np.array(Image.open(depth_path))
+    # camera_info = {
+    #     "fx": 908.5330810546875,
+    #     "fy": 909.3223876953125,
+    #     "cx": 647.282470703125,
+    #     "cy": 354.7244873046875,
+    #     "image_width": 1280,
+    #     "image_height": 720,
+    #     "factor_depth": 1000.0,
+    # }
+    # interface.image_test(color, depth, camera_info)
 
     # real ros demo
     rospy.spin()
